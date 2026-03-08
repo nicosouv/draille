@@ -1,0 +1,29 @@
+# ─── PlatformIO ───────────────────────────────────────────────────────────────
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# ─── Build artifacts ──────────────────────────────────────────────────────────
+*.bin
+*.elf
+*.map
+*.hex
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ─── TFT_eSPI user config (machine-specific) ──────────────────────────────────
+# Uncomment if you keep User_Setup.h locally and not in version control
+# .pio/libdeps/*/TFT_eSPI/User_Setup.h
+
+# ─── Serial / logs ────────────────────────────────────────────────────────────
+*.log
