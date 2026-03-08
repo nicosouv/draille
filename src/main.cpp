@@ -38,7 +38,7 @@ void setup() {
     ui.begin();
     display.drawBoot(4, 4, "Ready");
 
-    delay(500); // brief pause on "Ready" before switching to dashboard
+    delay(500);
 
 #ifdef DEBUG
     Serial.println("[BOOT] All modules initialized.");

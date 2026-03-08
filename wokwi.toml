@@ -2,3 +2,4 @@
 version = 1
 firmware = ".pio/build/t-beam-supreme/firmware.bin"
 elf     = ".pio/build/t-beam-supreme/firmware.elf"
+gdbServerPort = 3333

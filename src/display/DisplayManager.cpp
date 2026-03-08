@@ -32,13 +32,11 @@ void DisplayManager::begin() {
     _tft.setRotation(0);
     _tft.fillScreen(C_BG);
 
-    // Full-screen sprite in PSRAM — eliminates all flicker
     _spr.setColorDepth(16);
     _spr.createSprite(240, 240);
     _spr.setTextWrap(false);
 
     _loadFonts();
-
     _lastActivityMs = millis();
 
 #ifdef DEBUG
