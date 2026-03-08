@@ -9,8 +9,54 @@
       "top": 0,
       "left": 0,
       "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "tft",
+      "top": -20,
+      "left": 300,
+      "attrs": { "rotation": "0" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnPrev",
+      "top": -60,
+      "left": -110,
+      "attrs": { "color": "blue", "label": "PREV (GPIO4)" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnNext",
+      "top": 20,
+      "left": -110,
+      "attrs": { "color": "green", "label": "NEXT (GPIO38)" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnSelect",
+      "top": 100,
+      "left": -110,
+      "attrs": { "color": "red", "label": "SELECT (GPIO39)" }
     }
   ],
-  "connections": [],
+  "connections": [
+    ["esp:3V3",  "tft:VCC",   "red",    []],
+    ["esp:3V3",  "tft:LED",   "red",    []],
+    ["esp:GND",  "tft:GND",   "black",  []],
+    ["esp:11",   "tft:MOSI",  "purple", []],
+    ["esp:12",   "tft:SCK",   "orange", []],
+    ["esp:10",   "tft:CS",    "yellow", []],
+    ["esp:9",    "tft:DC",    "green",  []],
+    ["esp:8",    "tft:RESET", "blue",   []],
+
+    [ "btnPrev:1.r",   "esp:4",   "blue",  [] ],
+    [ "btnPrev:2.r",   "esp:GND", "black", [] ],
+
+    [ "btnNext:1.r",   "esp:38",  "green", [] ],
+    [ "btnNext:2.r",   "esp:GND", "black", [] ],
+
+    [ "btnSelect:1.r", "esp:39",  "red",   [] ],
+    [ "btnSelect:2.r", "esp:GND", "black", [] ]
+  ],
   "dependencies": {}
 }
