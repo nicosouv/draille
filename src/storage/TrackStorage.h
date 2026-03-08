@@ -4,17 +4,7 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include "../config.h"
-#include "../gps/GpsManager.h"
-
-struct Session {
-    uint32_t startTime;
-    uint32_t endTime;
-    uint32_t stepCount;
-    float    totalDistance;  // km
-    float    elevationGain;  // meters
-    uint16_t pointCount;
-    char     filename[32];   // GPX filename on SPIFFS
-};
+#include "../types.h"
 
 class TrackStorage {
 public:

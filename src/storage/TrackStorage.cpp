@@ -29,7 +29,7 @@ void TrackStorage::begin() {
 bool TrackStorage::openSession(uint32_t startTime) {
     if (_sessionOpen) return false;
 
-    char iso[20];
+    char iso[21];  // "YYYY-MM-DDTHH:MM:SSZ" = 20 chars + \0
     _timestampToISO8601(startTime, iso, sizeof(iso));
 
     // Filename: /tracks/YYYYMMDD_HHMMSS.gpx
@@ -76,7 +76,7 @@ bool TrackStorage::openSession(uint32_t startTime) {
 bool TrackStorage::appendPoint(const TrackPoint& point) {
     if (!_sessionOpen || !_file) return false;
 
-    char iso[20];
+    char iso[21];  // "YYYY-MM-DDTHH:MM:SSZ" = 20 chars + \0
     _timestampToISO8601(point.timestamp, iso, sizeof(iso));
 
     _file.printf(

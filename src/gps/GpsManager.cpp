@@ -45,35 +45,35 @@ bool GpsManager::isTracking() const {
     return _tracking;
 }
 
-bool GpsManager::isFixed() const {
+bool GpsManager::isFixed() {
     return _gps.location.isValid() && _gps.location.isUpdated();
 }
 
-double GpsManager::getLat() const {
+double GpsManager::getLat() {
     return _gps.location.lat();
 }
 
-double GpsManager::getLon() const {
+double GpsManager::getLon() {
     return _gps.location.lng();
 }
 
-float GpsManager::getAltitude() const {
+float GpsManager::getAltitude() {
     return _gps.altitude.isValid() ? (float)_gps.altitude.meters() : 0.0f;
 }
 
-float GpsManager::getSpeed() const {
+float GpsManager::getSpeed() {
     return _gps.speed.isValid() ? (float)_gps.speed.kmph() : 0.0f;
 }
 
-uint8_t GpsManager::getSatellites() const {
+uint8_t GpsManager::getSatellites() {
     return _gps.satellites.isValid() ? (uint8_t)_gps.satellites.value() : 0;
 }
 
-float GpsManager::getHdop() const {
+float GpsManager::getHdop() {
     return _gps.hdop.isValid() ? (float)_gps.hdop.hdop() : 99.9f;
 }
 
-uint32_t GpsManager::getTimestamp() const {
+uint32_t GpsManager::getTimestamp() {
     if (!_gps.date.isValid() || !_gps.time.isValid()) return 0;
 
     // Manual UTC epoch — avoids mktime() local-time dependency

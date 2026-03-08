@@ -25,5 +25,8 @@
 # Uncomment if you keep User_Setup.h locally and not in version control
 # .pio/libdeps/*/TFT_eSPI/User_Setup.h
 
+# ─── Fonts (TTF sources, not committed — see docs/fonts.md) ──────────────────
+fonts/
+
 # ─── Serial / logs ────────────────────────────────────────────────────────────
 *.log

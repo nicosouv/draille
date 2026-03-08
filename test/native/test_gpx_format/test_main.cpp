@@ -1,6 +1,7 @@
 #include <unity.h>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 
 // ─── Helpers under test (mirrors TrackStorage GPX rendering) ─────────────────
 
@@ -13,7 +14,7 @@ static void timestampToISO8601(uint32_t ts, char* buf, size_t len) {
 static int buildTrkpt(char* out, size_t outLen,
                       double lat, double lon, float alt,
                       uint32_t ts, float speed) {
-    char iso[20];
+    char iso[21];  // "YYYY-MM-DDTHH:MM:SSZ" = 20 chars + \0
     timestampToISO8601(ts, iso, sizeof(iso));
     return snprintf(out, outLen,
         "      <trkpt lat=\"%.7f\" lon=\"%.7f\">\n"
@@ -30,13 +31,13 @@ void setUp(void) {}
 void tearDown(void) {}
 
 void test_iso8601_epoch_zero() {
-    char buf[20];
+    char buf[21];
     timestampToISO8601(0, buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING("1970-01-01T00:00:00Z", buf);
 }
 
 void test_iso8601_known_date() {
-    char buf[20];
+    char buf[21];
     timestampToISO8601(1709886605u, buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING("2024-03-08T08:30:05Z", buf);
 }

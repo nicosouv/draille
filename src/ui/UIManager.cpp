@@ -37,6 +37,19 @@ void UIManager::update() {
 
     _handleInput();
     _wireTracking();
+    _periodicRender();
+}
+
+void UIManager::_periodicRender() {
+    // Screens that need animation refresh every 100ms even without user input
+    bool needsAnim = (_screen == AppScreen::WIFI_EXPORT)
+                  || (_screen == AppScreen::DASHBOARD && !_gps.isFixed())
+                  || (_screen == AppScreen::TRACKING  &&  _gps.isTracking());
+
+    if (needsAnim && millis() - _lastRenderMs >= 100) {
+        _lastRenderMs = millis();
+        _render();
+    }
 }
 
 // ─── Button reading ───────────────────────────────────────────────────────────
@@ -232,8 +245,8 @@ void UIManager::_wireTracking() {
     TrackPoint point;
     if (_gps.popTrackPoint(point)) {
         _storage.appendPoint(point);
+        _lastPointMs = millis();
 
-        // Refresh tracking screen if currently visible
         if (_screen == AppScreen::TRACKING) {
             _render();
         }
@@ -298,8 +311,9 @@ void UIManager::_buildTrackingData(TrackingData& d) const {
     d.isRecording    = _gps.isTracking();
     d.durationSec    = _sessionStartMs > 0 ? (millis() - _sessionStartMs) / 1000 : 0;
     d.speedKmh       = _gps.getSpeed();
-    d.distanceKm    = 0.0f;
-    d.elevationGain = 0.0f;
+    d.distanceKm     = 0.0f;
+    d.elevationGain  = 0.0f;
+    d.pointJustSaved = (millis() - _lastPointMs) < 500;
 
     Session current;
     if (_storage.getCurrentSession(current)) {

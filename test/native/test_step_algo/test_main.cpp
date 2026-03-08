@@ -49,10 +49,9 @@ void test_single_step_peak() {
     // Baseline at rest
     for (int i = 0; i < 20; i++) d.feed(0.0f, 0.0f, 1.0f, i * 20);
 
-    // One strong peak
-    d.feed(0.5f, 0.5f, 1.5f, 500);
-    d.feed(0.5f, 0.5f, 1.5f, 520);
-    d.feed(0.5f, 0.5f, 1.5f, 540);
+    // Sustained peak — LPF alpha=0.1 needs ~8+ samples to cross 1.2g threshold
+    // (0.8, 0.8, 0.8) → mag ≈ 1.386g ; filtered equilibrium ≈ 1.386
+    for (int i = 0; i < 15; i++) d.feed(0.8f, 0.8f, 0.8f, 500 + i * 20);
 
     TEST_ASSERT_GREATER_THAN(0u, d.stepCount);
 }

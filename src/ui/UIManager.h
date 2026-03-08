@@ -1,5 +1,7 @@
 #pragma once
 
+#include <FS.h>
+#include <SPIFFS.h>
 #include <Arduino.h>
 #include "../config.h"
 #include "../gps/GpsManager.h"
@@ -31,9 +33,11 @@ private:
     TrackStorage&   _storage;
     WifiExport&     _wifi;
 
-    AppScreen _screen        = AppScreen::DASHBOARD;
-    uint8_t   _trackSelected = 0;
+    AppScreen _screen         = AppScreen::DASHBOARD;
+    uint8_t   _trackSelected  = 0;
     uint32_t  _sessionStartMs = 0;
+    uint32_t  _lastPointMs    = 0;   // timestamp of last saved track point
+    uint32_t  _lastRenderMs   = 0;   // for periodic animated renders
 
     // Button state
     struct BtnState {
@@ -56,6 +60,7 @@ private:
     void _handleInput();
     void _render();
     void _wireTracking();
+    void _periodicRender();
 
     void _onPrev();
     void _onNext();

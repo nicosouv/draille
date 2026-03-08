@@ -3,9 +3,7 @@
 #include <math.h>
 
 void ImuManager::begin() {
-    Wire.begin(IMU_SDA, IMU_SCL);
-
-    if (!_imu.begin(Wire, QMI8658_L_SLAVE_ADDRESS)) {
+    if (!_imu.begin(Wire, QMI8658_L_SLAVE_ADDRESS, IMU_SDA, IMU_SCL)) {
 #ifdef DEBUG
         Serial.println("[IMU] QMI8658 not found — check wiring");
 #endif
