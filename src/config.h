@@ -15,7 +15,8 @@
 #define TFT_RST             48
 #define DISPLAY_WIDTH       240
 #define DISPLAY_HEIGHT      240
-#define DISPLAY_DIM_TIMEOUT 30000   // ms before auto-dim
+#define DISPLAY_DIM_TIMEOUT 60000   // ms before auto-dim
+#define UTC_OFFSET_SEC      3600    // UTC+1 (Europe/Paris CET; change to 7200 when DST active)
 
 // ─── IMU QMI8658 (SPI, onboard — internal PCB routing) ───────────────────────
 // Bus SPI interne : MOSI=35, MISO=37, SCLK=36 (not on expansion header)

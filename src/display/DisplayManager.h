@@ -7,7 +7,7 @@
 // ─── Data structs passed by UIManager ────────────────────────────────────────
 
 struct DashboardData {
-    char     timeStr[9];    // "HH:MM:SS"
+    char     timeStr[6];    // "HH:MM"
     double   lat;
     double   lon;
     uint8_t  satellites;    // 0-12
@@ -31,6 +31,10 @@ struct StatsData {
     float    avgSpeedKmh;
 };
 
+struct WifiExportData {
+    uint32_t elapsedMs;   // ms since WiFi export started
+};
+
 // ─── DisplayManager ───────────────────────────────────────────────────────────
 
 class DisplayManager {
@@ -38,6 +42,8 @@ public:
     void begin();
     void update();
     void wake();
+
+    void setCurrentScreen(AppScreen s);
 
     void drawBoot(uint8_t step, uint8_t total, const char* label);
     void setDebugData(bool pmuOk, uint32_t gpsBytes, uint8_t sats, bool gpsValid,
@@ -47,7 +53,7 @@ public:
     void drawTracking(const TrackingData& d);
     void drawStats(const StatsData& d);
     void drawTracks(const Session* sessions, uint8_t count, uint8_t selected);
-    void drawWifiExport();
+    void drawWifiExport(const WifiExportData& d);
 
     bool isDimmed() const;
 
@@ -55,16 +61,16 @@ private:
     TFT_eSPI    _tft;
     TFT_eSprite _spr  = TFT_eSprite(&_tft);
 
-    bool     _dimmed         = false;
-    bool     _fontsLoaded    = false;
-    bool     _dbgPmuOk       = false;
-    uint32_t _dbgGpsBytes    = 0;
-    uint8_t  _dbgSats        = 0;
-    bool     _dbgValid       = false;
-    uint16_t _dbgNmeaOk      = 0;
-    uint16_t _dbgNmeaFail    = 0;
-    uint8_t  _fontSizeHint   = 4;   // fallback built-in font index
-    uint32_t _lastActivityMs = 0;
+    bool      _dimmed         = false;
+    bool      _fontsLoaded    = false;
+    bool      _dbgPmuOk       = false;
+    uint32_t  _dbgGpsBytes    = 0;
+    uint8_t   _dbgSats        = 0;
+    bool      _dbgValid       = false;
+    uint16_t  _dbgNmeaOk      = 0;
+    uint16_t  _dbgNmeaFail    = 0;
+    uint32_t  _lastActivityMs = 0;
+    AppScreen _currentScreen  = AppScreen::DASHBOARD;
 
     // ── Rendering core ───────────────────────────────────────────────────────
     void _push();
@@ -83,6 +89,7 @@ private:
     void _progressArc(int x, int y, int rOut, int rIn,
                       float progress, uint16_t color, uint16_t bgColor);
     void _divider(int y, int halfW = 50);
+    void _drawNavDots();
 
     // ── Icons (programmatic) ──────────────────────────────────────────────────
     void _iconGps   (int cx, int cy, int r, uint16_t color);

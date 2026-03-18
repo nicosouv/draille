@@ -10,14 +10,6 @@
 #include "../storage/TrackStorage.h"
 #include "../export/WifiExport.h"
 
-enum class AppScreen {
-    DASHBOARD,
-    TRACKING,
-    STATS,
-    TRACKS,
-    WIFI_EXPORT
-};
-
 class UIManager {
 public:
     UIManager(GpsManager& gps, ImuManager& imu, DisplayManager& display,
@@ -36,8 +28,10 @@ private:
     AppScreen _screen         = AppScreen::DASHBOARD;
     uint8_t   _trackSelected  = 0;
     uint32_t  _sessionStartMs = 0;
-    uint32_t  _lastPointMs    = 0;   // timestamp of last saved track point
-    uint32_t  _lastRenderMs   = 0;   // for periodic animated renders
+    uint32_t  _lastPointMs    = 0;
+    uint32_t  _lastRenderMs   = 0;
+    uint32_t  _wifiStartMs    = 0;
+    uint32_t  _autoReturnMs   = 0;   // when >0: auto-navigate to DASHBOARD at this millis()
 
     // Button state
     struct BtnState {

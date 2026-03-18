@@ -1,6 +1,14 @@
 #pragma once
 #include <stdint.h>
 
+enum class AppScreen : uint8_t {
+    DASHBOARD   = 0,
+    TRACKING    = 1,
+    STATS       = 2,
+    TRACKS      = 3,
+    WIFI_EXPORT = 4
+};
+
 struct TrackPoint {
     double   lat;
     double   lon;

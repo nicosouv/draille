@@ -41,13 +41,27 @@ void UIManager::update() {
 }
 
 void UIManager::_periodicRender() {
-    // Screens that need animation refresh every 100ms even without user input
-    bool needsAnim = (_screen == AppScreen::WIFI_EXPORT)
+    // Auto-return to DASHBOARD after stop tracking
+    if (_autoReturnMs > 0 && millis() >= _autoReturnMs) {
+        _autoReturnMs = 0;
+        _screen = AppScreen::DASHBOARD;
+        _render();
+        return;
+    }
+
+    // Fast animation (100ms): comet spinner while acquiring, tracking pulse, WiFi
+    bool needsFast = (_screen == AppScreen::WIFI_EXPORT)
                   || (_screen == AppScreen::DASHBOARD && !_gps.isFixed())
                   || (_screen == AppScreen::TRACKING  &&  _gps.isTracking());
 
-    if (needsAnim && millis() - _lastRenderMs >= 100) {
-        _lastRenderMs = millis();
+    // Slow refresh (1s): dashboard clock update when GPS is fixed
+    bool needsSlow = (_screen == AppScreen::DASHBOARD && _gps.isFixed());
+
+    uint32_t now = millis();
+    uint32_t interval = needsFast ? 100 : (needsSlow ? 1000 : 0);
+
+    if (interval > 0 && now - _lastRenderMs >= interval) {
+        _lastRenderMs = now;
         _render();
     }
 }
@@ -60,26 +74,22 @@ void UIManager::_readButton(BtnState& btn, int pin) {
 
     if (raw == btn.lastRaw) return;
 
-    // State changed — apply debounce
     if (now - btn.changedAt < BTN_DEBOUNCE_MS) return;
 
     btn.lastRaw   = raw;
     btn.changedAt = now;
 
     if (raw == LOW) {
-        // Button pressed down
         btn.isDown     = true;
         btn.pressedAt  = now;
         btn.firedShort = false;
         btn.firedLong  = false;
     } else {
-        // Button released
         btn.isDown = false;
     }
 }
 
 bool UIManager::_justPressed(const BtnState& btn) const {
-    // Fires once on release (after debounce, before long press threshold)
     return !btn.isDown && !btn.firedShort && !btn.firedLong
            && btn.changedAt > 0
            && (millis() - btn.pressedAt) < BTN_LONG_PRESS_MS;
@@ -97,7 +107,6 @@ bool UIManager::_justLongPressed(BtnState& btn) {
 // ─── Input handling ───────────────────────────────────────────────────────────
 
 void UIManager::_handleInput() {
-    // Wake on any button press
     if (_display.isDimmed()) {
         if (_btnPrev.isDown || _btnNext.isDown || _btnSelect.isDown) {
             _display.wake();
@@ -130,6 +139,16 @@ void UIManager::_handleInput() {
 void UIManager::_onPrev() {
     if (_screen == AppScreen::WIFI_EXPORT) return;
 
+    // On TRACKS screen: scroll the list backwards
+    if (_screen == AppScreen::TRACKS) {
+        uint8_t count = _storage.getSessionCount();
+        if (count > 0) {
+            _trackSelected = (_trackSelected + count - 1) % count;
+            _render();
+        }
+        return;
+    }
+
     for (uint8_t i = 0; i < NAV_COUNT; i++) {
         if (NAV_ORDER[i] == _screen) {
             _screen = NAV_ORDER[(i + NAV_COUNT - 1) % NAV_COUNT];
@@ -137,7 +156,6 @@ void UIManager::_onPrev() {
         }
     }
 
-    // Reset track selection when entering TRACKS screen
     if (_screen == AppScreen::TRACKS) _trackSelected = 0;
 
     _render();
@@ -149,6 +167,16 @@ void UIManager::_onPrev() {
 
 void UIManager::_onNext() {
     if (_screen == AppScreen::WIFI_EXPORT) return;
+
+    // On TRACKS screen: scroll the list forwards
+    if (_screen == AppScreen::TRACKS) {
+        uint8_t count = _storage.getSessionCount();
+        if (count > 0) {
+            _trackSelected = (_trackSelected + 1) % count;
+            _render();
+        }
+        return;
+    }
 
     for (uint8_t i = 0; i < NAV_COUNT; i++) {
         if (NAV_ORDER[i] == _screen) {
@@ -178,12 +206,7 @@ void UIManager::_onSelect() {
             break;
 
         case AppScreen::TRACKS: {
-            // Scroll through tracks list
-            uint8_t count = _storage.getSessionCount();
-            if (count > 0) {
-                _trackSelected = (_trackSelected + 1) % count;
-                _render();
-            }
+            // SELECT on TRACKS is now a no-op (PREV/NEXT scroll)
             break;
         }
 
@@ -208,6 +231,7 @@ void UIManager::_onLongSelect() {
         _screen = AppScreen::DASHBOARD;
     } else {
         _screen = AppScreen::WIFI_EXPORT;
+        _wifiStartMs = millis();
         _wifi.startExport();
     }
     _render();
@@ -234,6 +258,10 @@ void UIManager::_stopTracking() {
     _gps.stopTracking();
     _storage.closeSession(_gps.getTimestamp(), _imu.getStepCount());
 
+    // Auto-return to DASHBOARD after 4 seconds on STATS
+    _screen       = AppScreen::STATS;
+    _autoReturnMs = millis() + 4000;
+
 #ifdef DEBUG
     Serial.println("[UI] Tracking stopped");
 #endif
@@ -256,6 +284,8 @@ void UIManager::_wireTracking() {
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
 void UIManager::_render() {
+    _display.setCurrentScreen(_screen);
+
     switch (_screen) {
         case AppScreen::DASHBOARD: {
             DashboardData d;
@@ -282,9 +312,12 @@ void UIManager::_render() {
             _display.drawTracks(sessions, count, _trackSelected);
             break;
         }
-        case AppScreen::WIFI_EXPORT:
-            _display.drawWifiExport();
+        case AppScreen::WIFI_EXPORT: {
+            WifiExportData d;
+            d.elapsedMs = _wifiStartMs > 0 ? (millis() - _wifiStartMs) : 0;
+            _display.drawWifiExport(d);
             break;
+        }
     }
 }
 
@@ -293,11 +326,11 @@ void UIManager::_render() {
 void UIManager::_buildDashboardData(DashboardData& d) const {
     uint32_t ts = _gps.getTimestamp();
     if (ts > 0) {
-        time_t t = (time_t)ts;
+        time_t t = (time_t)(ts + UTC_OFFSET_SEC);
         struct tm* tm_info = gmtime(&t);
-        strftime(d.timeStr, sizeof(d.timeStr), "%H:%M:%S", tm_info);
+        strftime(d.timeStr, sizeof(d.timeStr), "%H:%M", tm_info);
     } else {
-        strncpy(d.timeStr, "--:--:--", sizeof(d.timeStr));
+        strncpy(d.timeStr, "--:--", sizeof(d.timeStr));
     }
 
     d.lat        = _gps.getLat();
@@ -325,7 +358,7 @@ void UIManager::_buildTrackingData(TrackingData& d) const {
 void UIManager::_buildStatsData(StatsData& d) const {
     d.steps       = _imu.getStepCount();
     d.durationSec = _sessionStartMs > 0 ? (millis() - _sessionStartMs) / 1000 : 0;
-    d.distanceKm = 0.0f;
+    d.distanceKm  = 0.0f;
 
     Session current;
     if (_storage.getCurrentSession(current)) {

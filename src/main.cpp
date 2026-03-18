@@ -57,10 +57,10 @@ void setup() {
     Serial.println("[BOOT] storage ok");
 #endif
 
-    ui.begin();
     display.drawBoot(4, 4, "Ready");
-
     delay(500);
+
+    ui.begin();
 
 #ifdef DEBUG
     Serial.println("[BOOT] all modules ok");

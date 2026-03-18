@@ -1,6 +1,5 @@
 #include "DisplayManager.h"
 #include <Arduino.h>
-#include <SPIFFS.h>
 #include <cmath>
 #include <ctime>
 
@@ -12,7 +11,8 @@ static constexpr uint16_t C_WHITE   = 0xFFFF;   // #FFFFFF  primary text
 static constexpr uint16_t C_BLUE    = 0x043F;   // #0080FF  accent (Apple blue)
 static constexpr uint16_t C_GREEN   = 0x368B;   // #30D158  Apple green
 static constexpr uint16_t C_RED     = 0xFA07;   // #FF453A  Apple red / REC
-static constexpr uint16_t C_AMBER   = 0xFCA0;   // #FF9500  Apple amber (low sat)
+static constexpr uint16_t C_AMBER   = 0xFCA0;   // #FF9500  Apple amber
+static constexpr uint16_t C_AMBER_D = 0x7240;   // dim amber (comet mid-tail)
 static constexpr uint16_t C_GREY_H  = 0x7BEF;   // #787878  secondary text
 static constexpr uint16_t C_GREY_L  = 0x18E3;   // #1C1C1E  ring background
 
@@ -56,6 +56,10 @@ void DisplayManager::wake() {
 }
 
 bool DisplayManager::isDimmed() const { return _dimmed; }
+
+void DisplayManager::setCurrentScreen(AppScreen s) {
+    _currentScreen = s;
+}
 
 // ─── Screens ──────────────────────────────────────────────────────────────────
 
@@ -107,25 +111,36 @@ void DisplayManager::drawDashboard(const DashboardData& d) {
     _clear();
     wake();
 
-    // ── Satellite ring / acquiring spinner ───────────────────────────────────
+    // ── Satellite ring / comet spinner ────────────────────────────────────────
     if (!d.gpsFixed) {
-        // Rotating amber arc while waiting for fix
+        // Background ring
         _spr.drawSmoothArc(CX, CY, 116, 112, 0, 360, C_GREY_L, C_BG, true);
-        float spinStart = fmod(millis() / 8.0f, 360.0f);
-        float spinEnd   = spinStart + 90.0f;
-        if (spinEnd > 360.0f) {
-            _spr.drawSmoothArc(CX, CY, 116, 112, spinStart, 360.0f, C_AMBER, C_BG, false);
-            _spr.drawSmoothArc(CX, CY, 116, 112, 0.0f, spinEnd - 360.0f, C_AMBER, C_BG, false);
-        } else {
-            _spr.drawSmoothArc(CX, CY, 116, 112, spinStart, spinEnd, C_AMBER, C_BG, false);
-        }
+
+        // Comet tail: 3 overlapping arcs from head backwards
+        float head = fmod(millis() / 6.0f, 360.0f);
+
+        auto drawWrappedArc = [&](float sa, float ea, uint16_t color) {
+            sa = fmod(sa + 720.0f, 360.0f);
+            ea = fmod(ea + 720.0f, 360.0f);
+            if (ea <= sa) {
+                _spr.drawSmoothArc(CX, CY, 116, 112, sa, 360.0f, color, C_BG, false);
+                if (ea > 0.1f)
+                    _spr.drawSmoothArc(CX, CY, 116, 112, 0.0f, ea, color, C_BG, false);
+            } else {
+                _spr.drawSmoothArc(CX, CY, 116, 112, sa, ea, color, C_BG, false);
+            }
+        };
+
+        drawWrappedArc(head - 90.0f, head - 60.0f, C_GREY_L);  // dimmest tail
+        drawWrappedArc(head - 60.0f, head - 30.0f, C_AMBER_D); // mid tail
+        drawWrappedArc(head - 30.0f, head,         C_AMBER);   // bright head
     } else {
         _satRing(d.satellites);
     }
 
     // ── GPS status dot ────────────────────────────────────────────────────────
     uint16_t gpsColor = d.gpsFixed
-        ? (d.satellites >= 6 ? C_GREEN : C_AMBER)
+        ? (d.satellites >= 6 ? C_GREEN : (d.satellites >= 4 ? C_AMBER : C_RED))
         : C_RED;
     _spr.fillSmoothCircle(CX + 52, 64, 5, gpsColor, C_BG);
 
@@ -146,7 +161,7 @@ void DisplayManager::drawDashboard(const DashboardData& d) {
         _text(lonBuf, CX, 148, C_GREY_H);
     } else {
         _setFontS();
-        _text("acquiring fix", CX, 139, C_GREY_H);
+        _text("acquiring fix", CX, 139, C_AMBER);
     }
 
     // ── Steps ─────────────────────────────────────────────────────────────────
@@ -164,6 +179,7 @@ void DisplayManager::drawDashboard(const DashboardData& d) {
     _setFontS();
     _text("steps", CX + 10, 194, C_GREY_H);
 
+    _drawNavDots();
     _push();
 }
 
@@ -171,39 +187,46 @@ void DisplayManager::drawTracking(const TrackingData& d) {
     _clear();
     wake();
 
-    // ── Outer ring: time progress (1h = full) ─────────────────────────────────
-    float timeProgress = min(d.durationSec / 3600.0f, 1.0f);
+    // ── Outer ring: time progress (2h = full) ─────────────────────────────────
+    float timeProgress = min(d.durationSec / 7200.0f, 1.0f);
     _progressArc(CX, CY, 116, 109, timeProgress, C_BLUE, C_GREY_L);
 
-    // ── Inner ring: distance progress (5km = full) ───────────────────────────
-    float distProgress = min(d.distanceKm / 5.0f, 1.0f);
+    // ── Inner ring: distance progress (10km = full) ───────────────────────────
+    float distProgress = min(d.distanceKm / 10.0f, 1.0f);
     _progressArc(CX, CY, 104, 98, distProgress, C_GREEN, C_GREY_L);
 
-    // ── REC indicator + duration ──────────────────────────────────────────────
+    // ── REC indicator + status ────────────────────────────────────────────────
     if (d.isRecording) {
         bool pulse = (millis() / 800) % 2;
-        _iconRec(54, 72, pulse);
+        _iconRec(40, 72, pulse);
+        _setFontS();
+        _text("REC", 52, 72, pulse ? C_RED : C_GREY_H, ML_DATUM);
+    } else {
+        _setFontS();
+        _text("PAUSED", 40, 72, C_AMBER, ML_DATUM);
     }
 
+    // ── Duration (right side of top bar) ──────────────────────────────────────
     char durBuf[9];
     _fmtDuration(d.durationSec, durBuf, sizeof(durBuf));
     _setFontS();
-    _text(durBuf, CX + 12, 72, C_GREY_H);
+    _text(durBuf, 196, 72, C_GREY_H, MR_DATUM);
 
-    // ── Speed (main metric) ───────────────────────────────────────────────────
-    char spdBuf[8];
-    snprintf(spdBuf, sizeof(spdBuf), "%.1f", d.speedKmh);
+    // ── Distance (main metric) ────────────────────────────────────────────────
+    char distBuf[8];
+    snprintf(distBuf, sizeof(distBuf), "%.2f", d.distanceKm);
     _setFontL();
-    _text(spdBuf, CX, 112, C_WHITE);
+    _text(distBuf, CX, 112, C_WHITE);
 
     _setFontS();
-    _text("km/h", CX, 136, C_GREY_H);
+    _text("km", CX, 136, C_GREY_H);
 
-    // ── Distance ──────────────────────────────────────────────────────────────
-    char distBuf[10];
-    snprintf(distBuf, sizeof(distBuf), "%.2f km", d.distanceKm);
+    // ── Speed (secondary row) ─────────────────────────────────────────────────
+    char spdBuf[12];
+    snprintf(spdBuf, sizeof(spdBuf), "%.1f km/h", d.speedKmh);
+    _iconArrow(72, 158, true, C_GREY_H);
     _setFontM();
-    _text(distBuf, CX, 158, C_WHITE);
+    _text(spdBuf, CX + 10, 158, C_WHITE);
 
     // ── Elevation ─────────────────────────────────────────────────────────────
     char elevBuf[10];
@@ -217,6 +240,7 @@ void DisplayManager::drawTracking(const TrackingData& d) {
         _spr.fillSmoothCircle(CX + 68, CY - 68, 5, C_GREEN, C_BG);
     }
 
+    _drawNavDots();
     _push();
 }
 
@@ -224,51 +248,60 @@ void DisplayManager::drawStats(const StatsData& d) {
     _clear();
     wake();
 
-    // ── Outer ring decoration ─────────────────────────────────────────────────
     _spr.drawSmoothArc(CX, CY, 116, 114, 0, 360, C_GREY_L, C_BG, true);
 
-    // ── Title ─────────────────────────────────────────────────────────────────
     _setFontS();
     _text("SESSION", CX, 58, C_GREY_H);
     _divider(72, 40);
 
-    // ── Steps ─────────────────────────────────────────────────────────────────
-    _iconSteps(52, 96, 12, C_BLUE);
-    char buf[20];
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)d.steps);
-    _setFontM();
-    _spr.setTextDatum(ML_DATUM);
-    _spr.setTextColor(C_WHITE, C_BG);
-    _spr.drawString(buf, 72, 96, 4);
-    _setFontS();
-    _spr.drawString("steps", 72 + _spr.textWidth(buf, 4) + 6, 100, 2);
+    // Horizontal center divider
+    _divider(128, 70);
 
-    // ── Distance ──────────────────────────────────────────────────────────────
-    _iconArrow(52, 122, true, C_GREEN);
-    snprintf(buf, sizeof(buf), "%.2f", d.distanceKm);
-    _spr.setTextDatum(ML_DATUM);
-    _spr.setTextColor(C_WHITE, C_BG);
-    _spr.drawString(buf, 72, 122, 4);
-    _setFontS();
-    _spr.drawString("km", 72 + _spr.textWidth(buf, 4) + 6, 126, 2);
+    // ── Top-left: Steps ───────────────────────────────────────────────────────
+    {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%lu", (unsigned long)d.steps);
+        _iconSteps(CX - 45, 78, 10, C_BLUE);
+        _setFontM();
+        _text(buf, CX - 45, 93, C_WHITE);
+        _setFontS();
+        _text("steps", CX - 45, 112, C_GREY_H);
+    }
 
-    // ── Duration ──────────────────────────────────────────────────────────────
-    char durBuf[9];
-    _fmtDuration(d.durationSec, durBuf, sizeof(durBuf));
-    _spr.fillSmoothCircle(52, 148, 4, C_AMBER, C_BG);
-    _spr.setTextDatum(ML_DATUM);
-    _spr.setTextColor(C_WHITE, C_BG);
-    _spr.drawString(durBuf, 72, 148, 4);
+    // ── Top-right: Distance ───────────────────────────────────────────────────
+    {
+        char buf[12];
+        snprintf(buf, sizeof(buf), "%.2f", d.distanceKm);
+        _iconArrow(CX + 45, 78, true, C_GREEN);
+        _setFontM();
+        _text(buf, CX + 45, 93, C_WHITE);
+        _setFontS();
+        _text("km", CX + 45, 112, C_GREY_H);
+    }
 
-    // ── Avg speed ─────────────────────────────────────────────────────────────
-    snprintf(buf, sizeof(buf), "%.1f", d.avgSpeedKmh);
-    _iconArrow(52, 174, true, C_GREY_H);
-    _spr.setTextDatum(ML_DATUM);
-    _spr.setTextColor(C_GREY_H, C_BG);
-    _spr.drawString(buf, 72, 174, 4);
-    _setFontS();
-    _spr.drawString("avg km/h", 72 + _spr.textWidth(buf, 4) + 6, 178, 2);
+    // ── Bottom-left: Duration ─────────────────────────────────────────────────
+    {
+        char durBuf[9];
+        _fmtDuration(d.durationSec, durBuf, sizeof(durBuf));
+        _spr.fillSmoothCircle(CX - 45, 143, 4, C_AMBER, C_BG);
+        _setFontM();
+        _text(durBuf, CX - 45, 158, C_WHITE);
+        _setFontS();
+        _text("duration", CX - 45, 177, C_GREY_H);
+    }
 
+    // ── Bottom-right: Avg speed ────────────────────────────────────────────────
+    {
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%.1f", d.avgSpeedKmh);
+        _iconArrow(CX + 45, 143, true, C_GREY_H);
+        _setFontM();
+        _text(buf, CX + 45, 158, C_GREY_H);
+        _setFontS();
+        _text("avg km/h", CX + 45, 177, C_GREY_H);
+    }
+
+    _drawNavDots();
     _push();
 }
 
@@ -285,19 +318,20 @@ void DisplayManager::drawTracks(const Session* sessions, uint8_t count, uint8_t 
     if (count == 0) {
         _setFontS();
         _text("no saved tracks", CX, 120, C_GREY_H);
+        _drawNavDots();
         _push();
         return;
     }
 
-    // Show selected + 1 above + 1 below
-    int itemH = 28;
-    int startY = 92;
+    // Show selected + 1 above + 2 below (4 items total)
+    int itemH  = 22;
+    int startY = 78;
 
-    for (int offset = -1; offset <= 1; offset++) {
+    for (int offset = -1; offset <= 2; offset++) {
         int idx = (int)selected + offset;
         if (idx < 0 || idx >= (int)count) continue;
 
-        int y = startY + (offset + 1) * itemH;
+        int y      = startY + (offset + 1) * itemH;
         bool isSel = (offset == 0);
 
         char dateBuf[12];
@@ -306,25 +340,19 @@ void DisplayManager::drawTracks(const Session* sessions, uint8_t count, uint8_t 
         strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d", t);
 
         if (isSel) {
-            // Blue selection indicator
-            _spr.fillRoundRect(30, y - 11, 180, 22, 6, 0x0821); // very dark blue
-            _spr.drawSmoothRoundRect(30, y - 11, 6, 5, 180, 22, C_BLUE, C_BG);
-
-            _setFontS();
+            _spr.fillRoundRect(30, y - 10, 180, 20, 5, 0x0821);
+            _spr.drawSmoothRoundRect(30, y - 10, 5, 4, 180, 20, C_BLUE, C_BG);
             _spr.setTextDatum(ML_DATUM);
             _spr.setTextColor(C_WHITE, 0x0821);
             _spr.drawString(dateBuf, 44, y, 2);
-
             char distBuf[10];
             snprintf(distBuf, sizeof(distBuf), "%.1fkm", sessions[idx].totalDistance);
             _spr.setTextDatum(MR_DATUM);
             _spr.drawString(distBuf, 196, y, 2);
         } else {
-            _setFontS();
             _spr.setTextDatum(ML_DATUM);
             _spr.setTextColor(C_GREY_H, C_BG);
             _spr.drawString(dateBuf, 44, y, 2);
-
             char distBuf[10];
             snprintf(distBuf, sizeof(distBuf), "%.1fkm", sessions[idx].totalDistance);
             _spr.setTextDatum(MR_DATUM);
@@ -332,28 +360,46 @@ void DisplayManager::drawTracks(const Session* sessions, uint8_t count, uint8_t 
         }
     }
 
-    // Navigation dots
-    for (int i = 0; i < (int)count; i++) {
-        int dotX = CX - (count - 1) * 5 + i * 10;
-        uint16_t dotC = (i == (int)selected) ? C_BLUE : C_GREY_L;
-        _spr.fillSmoothCircle(dotX, 192, 3, dotC, C_BG);
+    // ── Detail strip for selected session ─────────────────────────────────────
+    {
+        uint32_t dur = (sessions[selected].endTime > sessions[selected].startTime)
+                       ? (sessions[selected].endTime - sessions[selected].startTime)
+                       : 0;
+        char durBuf[9];
+        _fmtDuration(dur, durBuf, sizeof(durBuf));
+
+        char detailBuf[40];
+        snprintf(detailBuf, sizeof(detailBuf), "%lu steps  %.1fkm  %s",
+                 (unsigned long)sessions[selected].stepCount,
+                 sessions[selected].totalDistance,
+                 durBuf);
+        _setFontS();
+        _text(detailBuf, CX, 188, C_GREY_H);
     }
 
+    // ── X/Y counter ───────────────────────────────────────────────────────────
+    {
+        char cntBuf[8];
+        snprintf(cntBuf, sizeof(cntBuf), "%u / %u", (unsigned)(selected + 1), (unsigned)count);
+        _setFontS();
+        _text(cntBuf, CX, 210, C_GREY_H);
+    }
+
+    _drawNavDots();
     _push();
 }
 
-void DisplayManager::drawWifiExport() {
+void DisplayManager::drawWifiExport(const WifiExportData& d) {
     _clear();
     wake();
 
     _spr.drawSmoothArc(CX, CY, 116, 114, 0, 360, C_GREY_L, C_BG, true);
 
-    // ── WiFi icon animé (arcs s'allument un par un) ───────────────────────────
+    // ── WiFi icon (arcs light up one by one) ──────────────────────────────────
     {
-        // Phase 0-3: none → small → med → all → repeat (400ms/step)
         uint8_t phase = (millis() / 400) % 5;
         int thick = 3;
-        int base  = 90 + 40 / 2;  // anchor y
+        int base  = 90 + 40 / 2;
 
         uint16_t c0 = (phase >= 1) ? C_BLUE : C_GREY_L;
         uint16_t c1 = (phase >= 2) ? C_BLUE : C_GREY_L;
@@ -377,7 +423,17 @@ void DisplayManager::drawWifiExport() {
     // ── Status ────────────────────────────────────────────────────────────────
     bool pulse = (millis() / 1000) % 2;
     _spr.fillSmoothCircle(CX - 38, 178, 3, pulse ? C_GREEN : C_GREY_L, C_BG);
+    _setFontS();
     _text("waiting", CX + 4, 178, C_GREY_H);
+
+    // ── Countdown ─────────────────────────────────────────────────────────────
+    uint32_t remaining = (d.elapsedMs < 300000) ? (300000 - d.elapsedMs) : 0;
+    uint32_t m = remaining / 60000;
+    uint32_t s = (remaining % 60000) / 1000;
+    char countBuf[18];
+    snprintf(countBuf, sizeof(countBuf), "auto-off %02lu:%02lu", (unsigned long)m, (unsigned long)s);
+    _setFontS();
+    _text(countBuf, CX, 196, C_GREY_H);
 
     _push();
 }
@@ -447,35 +503,28 @@ void DisplayManager::_dim() {
 // ─── Font helpers ─────────────────────────────────────────────────────────────
 
 void DisplayManager::_loadFonts() {
-    bool l = SPIFFS.exists("/" FONT_L_NAME ".vlw");
-    bool m = SPIFFS.exists("/" FONT_M_NAME ".vlw");
-    bool s = SPIFFS.exists("/" FONT_S_NAME ".vlw");
-#ifdef DEBUG
-    Serial.printf("[DISPLAY] fonts: L=%d M=%d S=%d\n", l, m, s);
-#endif
-    _fontsLoaded = l && m && s;
+    // Smooth font loading disabled — using built-in fonts only for now
+    _fontsLoaded = false;
 }
 
 void DisplayManager::_setFontL() {
-    if (_fontsLoaded) { _spr.loadFont(FONT_L_NAME, SPIFFS); }
-    else { _spr.setTextFont(2); _spr.setTextSize(2); }
+    _spr.setTextFont(2);
+    _spr.setTextSize(3);   // 16 * 3 = ~48px
 }
 
 void DisplayManager::_setFontM() {
-    if (_fontsLoaded) { _spr.loadFont(FONT_M_NAME, SPIFFS); }
-    else { _spr.setTextFont(2); _spr.setTextSize(1); }
+    _spr.setTextFont(2);
+    _spr.setTextSize(2);   // 16 * 2 = ~32px
 }
 
 void DisplayManager::_setFontS() {
-    if (_fontsLoaded) { _spr.loadFont(FONT_S_NAME, SPIFFS); }
-    else { _spr.setTextFont(2); _spr.setTextSize(1); }
+    _spr.setTextFont(2);
+    _spr.setTextSize(1);   // 16px
 }
 
 void DisplayManager::_text(const char* t, int x, int y, uint16_t color, uint8_t datum) {
-    _spr.unloadFont();
     _spr.setTextDatum(datum);
     _spr.setTextColor(color, C_BG);
-    _spr.setTextSize(1);
     _spr.drawString(t, x, y, 2);
 }
 
@@ -493,7 +542,6 @@ void DisplayManager::_progressArc(int x, int y, int rOut, int rIn,
     float endA   = startA + deg;
 
     if (endA >= 360.0f) {
-        // Wrap: draw two segments
         _spr.drawSmoothArc(x, y, rOut, rIn, startA, 360.0f, color, C_BG, false);
         _spr.drawSmoothArc(x, y, rOut, rIn, 0.0f, endA - 360.0f, color, C_BG, false);
     } else {
@@ -505,25 +553,35 @@ void DisplayManager::_divider(int y, int halfW) {
     _spr.drawFastHLine(CX - halfW, y, halfW * 2, C_GREY_L);
 }
 
+void DisplayManager::_drawNavDots() {
+    static const AppScreen order[4] = {
+        AppScreen::DASHBOARD, AppScreen::TRACKING,
+        AppScreen::STATS,     AppScreen::TRACKS
+    };
+    int xs[4] = { CX - 15, CX - 5, CX + 5, CX + 15 };
+    for (int i = 0; i < 4; i++) {
+        uint16_t c = (order[i] == _currentScreen) ? C_WHITE : C_GREY_L;
+        _spr.fillSmoothCircle(xs[i], 215, 3, c, C_BG);
+    }
+}
+
 // ─── Satellite ring ───────────────────────────────────────────────────────────
 
 void DisplayManager::_satRing(uint8_t satellites) {
-    // Background ring (dim)
     _spr.drawSmoothArc(CX, CY, 116, 112, 0, 360, C_GREY_L, C_BG, true);
 
     uint8_t n = min((uint8_t)12, satellites);
     if (n == 0) return;
 
-    // Each satellite = one 25° arc segment, with 5° gap
     float segW   = 25.0f;
     float step   = 30.0f;
-    float origin = 270.0f;   // start at top
+    float origin = 270.0f;
 
     for (int i = 0; i < n; i++) {
         float sa = fmod(origin + i * step, 360.0f);
         float ea = fmod(sa + segW, 360.0f);
 
-        uint16_t c = (satellites >= 8) ? C_GREEN
+        uint16_t c = (satellites >= 6) ? C_GREEN
                    : (satellites >= 4) ? C_AMBER
                    :                     C_RED;
 
@@ -539,34 +597,28 @@ void DisplayManager::_satRing(uint8_t satellites) {
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 void DisplayManager::_iconGps(int cx, int cy, int r, uint16_t color) {
-    // Location pin: filled teardrop shape
     _spr.fillSmoothCircle(cx, cy - r / 3, r / 2, color, C_BG);
-    // Triangle below
     for (int dy = 0; dy <= r; dy++) {
         float t = (float)dy / r;
         int hw  = (int)((r / 2) * (1.0f - t));
         if (hw > 0) _spr.drawFastHLine(cx - hw, cy - r / 3 + r / 2 + dy, hw * 2, color);
     }
-    // Inner hole
     _spr.fillSmoothCircle(cx, cy - r / 3, r / 4, C_BG, color);
 }
 
 void DisplayManager::_iconSteps(int cx, int cy, int size, uint16_t color) {
-    // Two ellipses — left and right footprint
     int s = size / 3;
     _spr.fillSmoothCircle(cx - s,     cy - s / 2, s,     color, C_BG);
     _spr.fillSmoothCircle(cx + s + 1, cy + s / 2, s - 1, color, C_BG);
 }
 
 void DisplayManager::_iconWifi(int cx, int cy, int size, uint16_t color) {
-    // Three concentric arcs (135°-45° span — open facing down)
     int thick = 3;
     for (int i = 0; i < 3; i++) {
         int r = size - i * (size / 3);
         if (r < 4) break;
         _spr.drawSmoothArc(cx, cy + size / 2, r, r - thick, 225, 315, color, C_BG, true);
     }
-    // Center dot
     _spr.fillSmoothCircle(cx, cy + size / 2, thick, color, C_BG);
 }
 
@@ -577,9 +629,7 @@ void DisplayManager::_iconRec(int cx, int cy, bool active) {
 
 void DisplayManager::_iconArrow(int cx, int cy, bool up, uint16_t color) {
     int dir = up ? -1 : 1;
-    // Vertical line
     _spr.drawFastVLine(cx, cy - 5 * dir, 10, color);
-    // Arrow head
     for (int i = 0; i < 4; i++) {
         _spr.drawFastHLine(cx - i, cy - (5 - i) * dir, 2 * i + 1, color);
     }
