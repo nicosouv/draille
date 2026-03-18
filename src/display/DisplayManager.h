@@ -40,6 +40,9 @@ public:
     void wake();
 
     void drawBoot(uint8_t step, uint8_t total, const char* label);
+    void setDebugData(bool pmuOk, uint32_t gpsBytes, uint8_t sats, bool gpsValid,
+                      uint16_t nmeaOk, uint16_t nmeaFail);
+    void drawDebugScreen();
     void drawDashboard(const DashboardData& d);
     void drawTracking(const TrackingData& d);
     void drawStats(const StatsData& d);
@@ -54,6 +57,13 @@ private:
 
     bool     _dimmed         = false;
     bool     _fontsLoaded    = false;
+    bool     _dbgPmuOk       = false;
+    uint32_t _dbgGpsBytes    = 0;
+    uint8_t  _dbgSats        = 0;
+    bool     _dbgValid       = false;
+    uint16_t _dbgNmeaOk      = 0;
+    uint16_t _dbgNmeaFail    = 0;
+    uint8_t  _fontSizeHint   = 4;   // fallback built-in font index
     uint32_t _lastActivityMs = 0;
 
     // ── Rendering core ───────────────────────────────────────────────────────

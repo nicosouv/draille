@@ -1,5 +1,5 @@
 [wokwi]
 version = 1
-firmware = ".pio/build/t-beam-supreme/firmware.bin"
-elf     = ".pio/build/t-beam-supreme/firmware.elf"
+firmware = ".pio/build/wokwi-test/firmware.bin"
+elf     = ".pio/build/wokwi-test/firmware.elf"
 gdbServerPort = 3333

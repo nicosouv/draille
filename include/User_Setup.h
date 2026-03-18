@@ -6,19 +6,19 @@
 // ── Driver ───────────────────────────────────────────────────────────────────
 // Use GC9A01_DRIVER for real hardware; ILI9341_DRIVER for Wokwi simulation.
 // Comment/uncomment as needed:
-//#define GC9A01_DRIVER
-#define ILI9341_DRIVER
+#define GC9A01_DRIVER
+//#define ILI9341_DRIVER
 
 // ── Resolution ───────────────────────────────────────────────────────────────
 #define TFT_WIDTH  240
 #define TFT_HEIGHT 240
 
-// ── Pins (ESP32-S3 GPIO) ──────────────────────────────────────────────────────
-#define TFT_MOSI  11
-#define TFT_SCLK  13   // NOTE: was 12 in config.h — 12 conflicts with GPS_TX_PIN
-#define TFT_CS    10
-#define TFT_DC     9
-#define TFT_RST    8
+// ── Pins (T-Beam Supreme expansion header GPIOs) ──────────────────────────────
+#define TFT_MOSI   3
+#define TFT_SCLK   6
+#define TFT_CS    45
+#define TFT_DC    46
+#define TFT_RST   48
 
 // ── SPI speed ────────────────────────────────────────────────────────────────
 #define SPI_FREQUENCY       27000000

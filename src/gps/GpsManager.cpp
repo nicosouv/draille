@@ -2,6 +2,9 @@
 #include <Arduino.h>
 
 void GpsManager::begin() {
+    pinMode(GPS_EN_PIN, OUTPUT);
+    digitalWrite(GPS_EN_PIN, HIGH);
+
     _serial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
 #ifdef DEBUG
@@ -12,7 +15,24 @@ void GpsManager::begin() {
 void GpsManager::update() {
     while (_serial.available()) {
         _gps.encode(_serial.read());
+        rawBytesReceived++;
     }
+
+    nmeaOk   = _gps.passedChecksum();
+    nmeaFail = _gps.failedChecksum();
+
+#ifdef DEBUG
+    static uint32_t _lastLog = 0;
+    if (millis() - _lastLog > 5000) {
+        _lastLog = millis();
+        Serial.printf("[GPS] sats=%u valid=%d updated=%d lat=%.6f lon=%.6f\n",
+            _gps.satellites.isValid() ? _gps.satellites.value() : 0,
+            _gps.location.isValid(),
+            _gps.location.isUpdated(),
+            _gps.location.isValid() ? _gps.location.lat() : 0.0,
+            _gps.location.isValid() ? _gps.location.lng() : 0.0);
+    }
+#endif
 
     if (_tracking && isFixed()) {
         uint32_t now = millis();
@@ -46,7 +66,7 @@ bool GpsManager::isTracking() const {
 }
 
 bool GpsManager::isFixed() {
-    return _gps.location.isValid() && _gps.location.isUpdated();
+    return _gps.location.isValid() && _gps.satellites.isValid() && _gps.satellites.value() > 0;
 }
 
 double GpsManager::getLat() {

@@ -4,17 +4,17 @@
   "editor": "wokwi",
   "parts": [
     {
-      "type": "wokwi-esp32-s3-devkitc-1",
+      "type": "board-esp32-s3-devkitc-1",
       "id": "esp",
-      "top": 0,
+      "top": -40,
       "left": 0,
-      "attrs": {}
+      "attrs": { "rotation": "90" }
     },
     {
       "type": "wokwi-ili9341",
       "id": "tft",
-      "top": -20,
-      "left": 300,
+      "top": -100,
+      "left": 120,
       "attrs": { "rotation": "0" }
     },
     {
@@ -42,21 +42,20 @@
   "connections": [
     ["esp:3V3",  "tft:VCC",   "red",    []],
     ["esp:3V3",  "tft:LED",   "red",    []],
-    ["esp:GND",  "tft:GND",   "black",  []],
+    ["esp:GND.1","tft:GND",   "black",  []],
     ["esp:11",   "tft:MOSI",  "purple", []],
     ["esp:12",   "tft:SCK",   "orange", []],
     ["esp:10",   "tft:CS",    "yellow", []],
-    ["esp:9",    "tft:DC",    "green",  []],
-    ["esp:8",    "tft:RESET", "blue",   []],
+    ["esp:9",    "tft:D/C",   "green",  []],
 
-    [ "btnPrev:1.r",   "esp:4",   "blue",  [] ],
-    [ "btnPrev:2.r",   "esp:GND", "black", [] ],
+    ["btnPrev:1.r",   "esp:4",   "blue",  []],
+    ["btnPrev:2.r",   "esp:GND.2","black", []],
 
-    [ "btnNext:1.r",   "esp:38",  "green", [] ],
-    [ "btnNext:2.r",   "esp:GND", "black", [] ],
+    ["btnNext:1.r",   "esp:38",  "green", []],
+    ["btnNext:2.r",   "esp:GND.3","black", []],
 
-    [ "btnSelect:1.r", "esp:39",  "red",   [] ],
-    [ "btnSelect:2.r", "esp:GND", "black", [] ]
+    ["btnSelect:1.r", "esp:39",  "red",   []],
+    ["btnSelect:2.r", "esp:GND.4","black", []]
   ],
   "dependencies": {}
 }

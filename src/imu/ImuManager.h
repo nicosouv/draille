@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Wire.h>
+#include <SPI.h>
 #include <SensorQMI8658.hpp>
 #include "../config.h"
 

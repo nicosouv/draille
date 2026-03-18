@@ -34,5 +34,10 @@ private:
     TrackPoint _pendingPoint = {};
     uint32_t   _lastRecordMs = 0;
 
+public:
+    uint32_t rawBytesReceived = 0;
+    uint16_t nmeaOk           = 0;   // sentences with valid checksum
+    uint16_t nmeaFail         = 0;   // sentences with failed checksum
+
     void _recordPoint();
 };

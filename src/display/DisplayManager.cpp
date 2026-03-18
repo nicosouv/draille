@@ -382,10 +382,54 @@ void DisplayManager::drawWifiExport() {
     _push();
 }
 
+void DisplayManager::setDebugData(bool pmuOk, uint32_t gpsBytes, uint8_t sats, bool gpsValid,
+                                   uint16_t nmeaOk, uint16_t nmeaFail) {
+    _dbgPmuOk    = pmuOk;
+    _dbgGpsBytes = gpsBytes;
+    _dbgSats     = sats;
+    _dbgValid    = gpsValid;
+    _dbgNmeaOk   = nmeaOk;
+    _dbgNmeaFail = nmeaFail;
+}
+
 // ─── Rendering core ───────────────────────────────────────────────────────────
 
 void DisplayManager::_push() {
     _spr.pushSprite(0, 0);
+}
+
+void DisplayManager::drawDebugScreen() {
+    _clear();
+    _spr.unloadFont();
+    _spr.setTextDatum(MC_DATUM);
+
+    _spr.setTextColor(C_BLUE, C_BG);
+    _spr.drawString("-- DEBUG --", CX, 40, 2);
+
+    char buf[40];
+    uint16_t y = 75;
+    const uint16_t step = 22;
+
+    _spr.setTextColor(_dbgPmuOk ? C_GREEN : C_RED, C_BG);
+    snprintf(buf, sizeof(buf), "PMU: %s", _dbgPmuOk ? "OK" : "FAIL");
+    _spr.drawString(buf, CX, y, 2); y += step;
+
+    _spr.setTextColor(C_WHITE, C_BG);
+    snprintf(buf, sizeof(buf), "bytes: %lu", (unsigned long)_dbgGpsBytes);
+    _spr.drawString(buf, CX, y, 2); y += step;
+
+    snprintf(buf, sizeof(buf), "nmea ok:%u fail:%u", _dbgNmeaOk, _dbgNmeaFail);
+    _spr.drawString(buf, CX, y, 2); y += step;
+
+    _spr.setTextColor(_dbgSats > 0 ? C_GREEN : C_AMBER, C_BG);
+    snprintf(buf, sizeof(buf), "sats: %u", _dbgSats);
+    _spr.drawString(buf, CX, y, 2); y += step;
+
+    _spr.setTextColor(_dbgValid ? C_GREEN : C_RED, C_BG);
+    snprintf(buf, sizeof(buf), "fix: %s", _dbgValid ? "YES" : "no");
+    _spr.drawString(buf, CX, y, 2);
+
+    _push();
 }
 
 void DisplayManager::_clear() {
@@ -403,45 +447,36 @@ void DisplayManager::_dim() {
 // ─── Font helpers ─────────────────────────────────────────────────────────────
 
 void DisplayManager::_loadFonts() {
-    // Smooth fonts loaded from SPIFFS at runtime.
-    // Generate with tools/gen_fonts.py and upload via: make fs-flash
-    // Falls back to TFT built-in fonts if files are missing.
-    _fontsLoaded = SPIFFS.exists("/" FONT_L_NAME ".vlw")
-                && SPIFFS.exists("/" FONT_M_NAME ".vlw")
-                && SPIFFS.exists("/" FONT_S_NAME ".vlw");
+    bool l = SPIFFS.exists("/" FONT_L_NAME ".vlw");
+    bool m = SPIFFS.exists("/" FONT_M_NAME ".vlw");
+    bool s = SPIFFS.exists("/" FONT_S_NAME ".vlw");
+#ifdef DEBUG
+    Serial.printf("[DISPLAY] fonts: L=%d M=%d S=%d\n", l, m, s);
+#endif
+    _fontsLoaded = l && m && s;
 }
 
 void DisplayManager::_setFontL() {
-    if (_fontsLoaded) {
-        _spr.loadFont(FONT_L_NAME, SPIFFS);
-    }
-    // Built-in fallback applied in _text()
+    if (_fontsLoaded) { _spr.loadFont(FONT_L_NAME, SPIFFS); }
+    else { _spr.setTextFont(2); _spr.setTextSize(2); }
 }
 
 void DisplayManager::_setFontM() {
-    if (_fontsLoaded) {
-        _spr.loadFont(FONT_M_NAME, SPIFFS);
-    }
+    if (_fontsLoaded) { _spr.loadFont(FONT_M_NAME, SPIFFS); }
+    else { _spr.setTextFont(2); _spr.setTextSize(1); }
 }
 
 void DisplayManager::_setFontS() {
-    if (_fontsLoaded) {
-        _spr.loadFont(FONT_S_NAME, SPIFFS);
-    }
+    if (_fontsLoaded) { _spr.loadFont(FONT_S_NAME, SPIFFS); }
+    else { _spr.setTextFont(2); _spr.setTextSize(1); }
 }
 
 void DisplayManager::_text(const char* t, int x, int y, uint16_t color, uint8_t datum) {
+    _spr.unloadFont();
     _spr.setTextDatum(datum);
     _spr.setTextColor(color, C_BG);
-
-    if (_fontsLoaded) {
-        _spr.drawString(t, x, y);
-        _spr.unloadFont();
-    } else {
-        // Fallback: pick built-in font by last loaded size
-        // (caller sets context via _setFontX before calling _text)
-        _spr.drawString(t, x, y, 2);
-    }
+    _spr.setTextSize(1);
+    _spr.drawString(t, x, y, 2);
 }
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
